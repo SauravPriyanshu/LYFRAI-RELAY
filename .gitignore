@@ -1,0 +1,36 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Node and frontend builds
+node_modules/
+dist/
+dist-ssr/
+coverage/
+test-results/
+playwright-report/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,27 @@
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Hashed build assets: cache for a year.
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+    }
+
+    # SPA entry point: never cache, so new deploys show up immediately.
+    location / {
+        try_files $uri /index.html;
+        expires -1;
+    }
+}
