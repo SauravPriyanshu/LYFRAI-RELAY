@@ -200,7 +200,9 @@ def test_simulate_first_key(client, header):
     r = chat(client, "sim", "fresh msg " + header, headers={"X-Simulate-Failure": header})
     assert r.status_code == 200
     m = r.json()["metadata"]
-    assert m["key_id"] == "key_2" and m["fallback_attempts"] == 1
+    assert m["key_id"] == "key_2"
+    assert m["fallback_attempts"] == 1
+    assert m["resolution_source"] == "LIVE_INFERENCE"
     assert r.json()["reply"]
 
 
@@ -211,6 +213,29 @@ def test_simulate_all_keys_503_not_persisted(client):
         assert r.status_code == 503
         assert r.json() == {"detail": "all providers unavailable"}
         assert client.get(f"/sessions/{sid}/messages").status_code == 404
+
+
+def test_simulate_all_keys_cached_message_still_503(client):
+    chat(client, "cached-allfail", "cached query")
+    r = chat(client, "cached-allfail-2", "cached query", headers={"X-Simulate-Failure": "*=429"})
+    assert r.status_code == 503
+    assert r.json() == {"detail": "all providers unavailable"}
+    assert client.get("/sessions/cached-allfail-2/messages").status_code == 404
+
+
+def test_simulate_second_key_only_succeeds_on_first(client):
+    r = chat(client, "sim-k2", "hello from key 1", headers={"X-Simulate-Failure": "key_2=429"})
+    assert r.status_code == 200
+    m = r.json()["metadata"]
+    assert m["key_id"] == "key_1"
+    assert m["fallback_attempts"] == 0
+
+
+def test_simulate_specific_key_wins_over_wildcard(client):
+    # key_1=500,*=429 -> both fail -> 503
+    r = chat(client, "spec-wild", "hello", headers={"X-Simulate-Failure": "key_1=500,*=429"})
+    assert r.status_code == 503
+    assert r.json() == {"detail": "all providers unavailable"}
 
 
 def test_simulate_is_per_request_only(client):
@@ -235,14 +260,38 @@ def test_simulation_ignored_when_disabled(make_client):
 
 
 def test_simulation_garbage_header_ignored(client):
-    r = chat(client, "g", "hi", headers={"X-Simulate-Failure": "junk,key_1=abc,key_1=418"})
+    r = chat(client, "g", "hi", headers={"X-Simulate-Failure": "junk,key_1=abc,key_1=418,=429"})
     assert r.status_code == 200 and r.json()["metadata"]["key_id"] == "key_1"
 
 
-def test_openapi_documents_simulate_failure_header(client):
+def test_simulation_case_insensitive_header(client):
+    r = chat(client, "ci-sim", "case insensitive header", headers={"x-simulate-failure": "key_1=429"})
+    assert r.status_code == 200
+    assert r.json()["metadata"]["key_id"] == "key_2"
+    assert r.json()["metadata"]["fallback_attempts"] == 1
+
+
+def test_real_failure_combined_with_simulated_failure(client, fake_llm):
+    # key_1 fails really (non-simulated), key_2 is simulated failed -> 503
+    fake_llm.failing_keys = {"k-one"}
+    r = chat(client, "real-sim-combo", "msg", headers={"X-Simulate-Failure": "key_2=500"})
+    assert r.status_code == 503
+    assert r.json() == {"detail": "all providers unavailable"}
+
+
+def test_health_includes_failure_simulation(make_client):
+    c_on = make_client(enable_failure_simulation=True)
+    assert c_on.get("/health").json()["failure_simulation"] is True
+
+    c_off = make_client(enable_failure_simulation=False)
+    assert c_off.get("/health").json()["failure_simulation"] is False
+
+
+def test_openapi_documents_simulate_failure_header_and_exact_paths(client):
     r = client.get("/openapi.json")
     assert r.status_code == 200
     schema = r.json()
+    assert set(schema["paths"].keys()) == {"/health", "/chat", "/sessions/{session_id}/messages"}
     post_chat = schema["paths"]["/chat"]["post"]
     params = post_chat.get("parameters", [])
     header_param = next((p for p in params if p.get("name") == "X-Simulate-Failure"), None)

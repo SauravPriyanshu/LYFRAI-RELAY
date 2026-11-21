@@ -9,7 +9,7 @@ import SessionsRail from './components/SessionsRail'
 import { useToast } from './components/Toasts'
 import { Skeleton } from './components/ui'
 import WakingServerBanner from './components/WakingServerBanner'
-import { deleteSession, loadSessions, upsertSession } from './sessionStorage'
+import { deleteSession, loadSessions, renameSession, upsertSession } from './sessionStorage'
 import type { ChatItem, ChatMetadata, HealthInfo, HealthStatus, StoredSession } from './types'
 import { copyText, newSessionId, uid } from './utils'
 
@@ -39,6 +39,7 @@ export default function App() {
   const [simulateFailure, setSimulateFailure] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [newestItemId, setNewestItemId] = useState<string | null>(null)
 
   // Sidebar state
   const [desktopCollapsed, setDesktopCollapsed] = useState<boolean>(getInitialDesktopCollapsed)
@@ -145,7 +146,7 @@ export default function App() {
       return
     }
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight
-    const isNear = distance <= 160
+    const isNear = distance <= 80
     isNearBottomRef.current = isNear
     setShowJumpToBottom(!isNear)
   }, [items.length])
@@ -230,6 +231,7 @@ export default function App() {
           role: 'user',
           content: text,
         }
+        setNewestItemId(userItem.id)
         setItems((prev) => [...prev, userItem])
       }
 
@@ -262,11 +264,12 @@ export default function App() {
           },
         }
 
+        setNewestItemId(assistantItem.id)
         setItems((prev) => [...prev, assistantItem])
 
         // Persist to client sessions list on first successful reply
         const existing = sessions.find((s) => s.id === sessionId)
-        const title = existing?.title || text.slice(0, 48)
+        const title = existing?.title || text
         const updated = upsertSession({
           id: sessionId,
           title,
@@ -288,10 +291,9 @@ export default function App() {
           (e instanceof ApiError && e.name === 'AbortError') ||
           (e instanceof DOMException && e.name === 'AbortError')
         ) {
-          setItems((prev) => [
-            ...prev,
-            { id: uid(), role: 'info', content: 'Request was stopped before the server responded.' },
-          ])
+          const infoItem: ChatItem = { id: uid(), role: 'info', content: 'Request was stopped before the server responded.' }
+          setNewestItemId(infoItem.id)
+          setItems((prev) => [...prev, infoItem])
           return
         }
 
@@ -303,6 +305,7 @@ export default function App() {
           retryText: text,
           status: err.status,
         }
+        setNewestItemId(errorItem.id)
         setItems((prev) => [...prev, errorItem])
 
         if (err.status === 422) {
@@ -391,6 +394,7 @@ export default function App() {
     if (sendingRef.current) return
     setSessionId(newSessionId())
     setItems([])
+    setNewestItemId(null)
     setDraft('')
     setSystemPrompt('')
     setSimulateFailure(null)
@@ -454,6 +458,7 @@ export default function App() {
           }
         })
         setItems(transformed)
+        setNewestItemId(null)
         const saved = sessions.find((s) => s.id === id)
         setSystemPrompt(saved?.systemPrompt ?? '')
       } catch (e) {
@@ -483,6 +488,14 @@ export default function App() {
     [sessionId, toast, handleNewSession],
   )
 
+  const handleRenameSession = useCallback(
+    (id: string, newTitle: string) => {
+      setSessions(renameSession(id, newTitle))
+      toast.success('Chat renamed', 'Chat title updated.')
+    },
+    [toast],
+  )
+
   const isSidebarOpen = isMobile ? mobileOpen : !desktopCollapsed
 
   const shellClassName = [
@@ -500,6 +513,7 @@ export default function App() {
         sessions={sessions}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
         onNewSession={handleNewSession}
         onClose={handleCloseMobileSidebar}
         busy={sending}
@@ -535,13 +549,13 @@ export default function App() {
 
         <div className="thread-wrap">
           <div
-            className="thread messages"
+            className="thread"
             ref={listRef}
             onScroll={handleScroll}
             data-testid="message-list"
             aria-live="polite"
           >
-            <div className="messages-inner">
+            <div className="messages-inner chat-col">
               {loadingHistory ? (
                 <div className="skeleton-history" data-testid="skeleton-history">
                   <div className="skeleton-item user">
@@ -566,7 +580,7 @@ export default function App() {
                       <button
                         key={s}
                         type="button"
-                        className="chip"
+                        className="chip ui-btn ui-btn-secondary ui-btn-sm"
                         onClick={() => {
                           setDraft(s)
                           chatInputRef.current?.focus()
@@ -579,17 +593,24 @@ export default function App() {
                 </div>
               ) : null}
 
-              {!loadingHistory &&
-                items.map((item) => (
+              {!loadingHistory && (() => {
+                const lastAssistantIdx = items.reduce(
+                  (last, it, idx) => (it.role === 'assistant' ? idx : last),
+                  -1,
+                )
+                return items.map((item, idx) => (
                   <MessageItem
                     key={item.id}
                     item={item}
+                    isNew={item.id === newestItemId}
+                    isNewest={idx === lastAssistantIdx}
                     onCopy={handleCopy}
                     onRetry={handleRetry}
                     onInspect={handleInspect}
                     disabled={sending}
                   />
-                ))}
+                ))
+              })()}
 
               {sending && (
                 <div
@@ -608,33 +629,42 @@ export default function App() {
             </div>
           </div>
 
-          {showJumpToBottom && (
-            <button
-              type="button"
-              className="jump jump-to-bottom-btn"
-              onClick={scrollToBottom}
-              aria-label="Jump to latest message"
+          <button
+            type="button"
+            className={`jump ${showJumpToBottom ? 'is-visible' : ''}`}
+            onClick={scrollToBottom}
+            aria-label="Jump to latest message"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              Jump to latest
-            </button>
-          )}
+              <path d="M12 5v14M19 12l-7 7-7-7" />
+            </svg>
+            <span>Jump to latest</span>
+          </button>
         </div>
 
-        <div className="composer">
-          <Composer
-            value={draft}
-            onChange={setDraft}
-            onSend={handleSend}
-            sending={sending}
-            onStopWaiting={handleStopWaiting}
-            hasCustomInstructions={systemPrompt.trim().length > 0}
-            lastSentMessage={lastSentMessageRef.current}
-            inputRef={chatInputRef}
-            canSimulateFailure={Boolean(healthInfo?.failure_simulation)}
-            simulate={simulateFailure}
-            onSelectSimulate={setSimulateFailure}
-          />
-        </div>
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSend={handleSend}
+          sending={sending}
+          onStopWaiting={handleStopWaiting}
+          hasCustomInstructions={systemPrompt.trim().length > 0}
+          lastSentMessage={lastSentMessageRef.current}
+          inputRef={chatInputRef}
+          canSimulateFailure={Boolean(healthInfo?.failure_simulation)}
+          simulate={simulateFailure}
+          onSelectSimulate={setSimulateFailure}
+        />
       </div>
 
       <InspectorDrawer

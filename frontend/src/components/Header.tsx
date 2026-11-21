@@ -63,65 +63,116 @@ export default function Header({
   }
 
   return (
-    <header className="topbar chat-header">
+    <header className="topbar">
       <div className="topbar-left">
         <Button
           ref={chatsButtonRef}
           variant="secondary"
           size="sm"
-          className="menu-button chats-toggle-btn"
+          className="ui-icon-btn chats-toggle-btn"
           onClick={onToggleRail}
-          aria-label="Toggle sessions navigation"
+          aria-label="Toggle chats (toggle sessions navigation)"
+          title="Toggle chats"
           aria-expanded={isSidebarOpen}
           aria-controls="sidebar"
         >
-          Chats
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18" />
+          </svg>
         </Button>
 
         {!isSidebarOpen && (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="topbar-new-chat-btn"
-            onClick={onNewSession}
-            disabled={busy}
-            aria-label="New session"
-          >
-            New chat
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="topbar-new-chat-btn"
+              onClick={onNewSession}
+              disabled={busy}
+              aria-label="New session"
+            >
+              New chat
+            </Button>
+            <span className="topbar-wordmark">Relay</span>
+          </>
         )}
-
-        <span className="brand-title">Relay</span>
       </div>
 
+      <div className="topbar-center" />
+
       <div className="topbar-right">
-        <div className="topbar-status">
+        {healthStatus === 'offline' ? (
           <button
             type="button"
-            className={`status-pill status-${healthStatus}`}
-            onClick={healthStatus === 'offline' ? onRetryHealth : undefined}
+            className="status-pill status-offline"
+            onClick={onRetryHealth}
             title={statusTooltip}
           >
-            <span className={`status-dot dot-${healthStatus}`} aria-hidden="true" />
+            <span className="status-dot dot-offline" aria-hidden="true" />
             <span className="status-label">{statusText}</span>
           </button>
-        </div>
+        ) : (
+          <div className={`status-pill status-${healthStatus}`} title={statusTooltip}>
+            <span className={`status-dot dot-${healthStatus}`} aria-hidden="true" />
+            <span className="status-label">{statusText}</span>
+          </div>
+        )}
 
-        <div className="session-block">
-          <span className="session-label">Session</span>
+        <div className="session-chip session-block">
+          <span className="session-label">SESSION</span>
           <span data-testid="session-id" className="session-full-id">
             {sessionId}
           </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="session-copy-btn"
+          <button
+            type="button"
+            className="session-copy-btn ui-icon-btn"
             onClick={handleCopySession}
-            title="Copy session id"
-            aria-label="Copy session id"
+            title={copied ? 'Copied' : 'Copy session id'}
+            aria-label={copied ? 'Copied session id' : 'Copy session id'}
           >
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
+            {copied ? (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--ok)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+            <span className="sr-only">{copied ? 'Copied' : 'Copy'}</span>
+          </button>
         </div>
       </div>
     </header>

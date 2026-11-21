@@ -23,7 +23,7 @@ export default function InstructionsBar({
     if (!el) return
     if (isExpanded) {
       el.style.height = 'auto'
-      const maxHeight = 120
+      const maxHeight = 160
       el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), maxHeight)}px`
       el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
     } else {
@@ -47,47 +47,59 @@ export default function InstructionsBar({
   }
 
   return (
-    <div className={`sysprompt-row ${isExpanded ? 'is-expanded' : ''}`}>
-      <div className="sysprompt-main">
-        <div className="sysprompt-label-group">
-          <label htmlFor="system-prompt-input" className="sysprompt-label">
-            System prompt
-          </label>
-          {isActive && (
-            <span className="sysprompt-active-badge" title="Custom system prompt is active">
-              <span className="sysprompt-active-dot" aria-hidden="true" />
-              Active
-            </span>
-          )}
-        </div>
+    <div className={`sysprompt-row chat-col ${isExpanded ? 'is-expanded' : ''}`}>
+      <div className="sysprompt-label-group">
+        <label htmlFor="system-prompt-input" className="sysprompt-label">
+          System prompt
+        </label>
+        {isActive && (
+          <span className="sysprompt-active-badge" title="Custom system prompt is active">
+            <span className="sysprompt-active-dot" aria-hidden="true" />
+            Active
+          </span>
+        )}
+      </div>
 
-        <div
-          className={`sysprompt-input-wrap ${isExpanded ? 'wrap-expanded' : ''} ${isActive ? 'has-value' : ''}`}
-        >
-          <textarea
-            ref={textareaRef}
-            id="system-prompt-input"
-            data-testid="system-prompt-input"
-            className="sysprompt-textarea"
-            rows={1}
-            maxLength={8000}
-            value={value}
-            placeholder={
-              isExpanded
-                ? 'Write instructions for the assistant (e.g. tone, persona, constraints)...'
-                : 'Set system prompt (e.g. You are a concise assistant)...'
-            }
-            onChange={(e) => onChange(e.target.value)}
-            onFocus={() => setIsExpanded(true)}
-            disabled={disabled}
-            aria-label="System prompt"
-          />
+      <div
+        className={`sysprompt-input-wrap ${isExpanded ? 'wrap-expanded' : ''} ${isActive ? 'has-value' : ''}`}
+      >
+        <textarea
+          ref={textareaRef}
+          id="system-prompt-input"
+          data-testid="system-prompt-input"
+          className="sysprompt-textarea"
+          rows={1}
+          maxLength={8000}
+          value={value}
+          placeholder={
+            isExpanded
+              ? 'Write instructions for the assistant (e.g. tone, persona, constraints)...'
+              : 'Example: You are a concise assistant.'
+          }
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setIsExpanded(true)}
+          disabled={disabled}
+          aria-label="System prompt"
+        />
 
-          <div className="sysprompt-actions">
-            {!isExpanded && (
+        <div className="sysprompt-actions">
+          {!isExpanded && (
+            <>
+              {value.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="2xs"
+                  className="sysprompt-clear-btn"
+                  onClick={handleClear}
+                  disabled={disabled}
+                  type="button"
+                >
+                  Clear
+                </Button>
+              )}
               <Button
                 variant="ghost"
-                size="sm"
+                size="2xs"
                 className="sysprompt-toggle-btn"
                 onClick={() => {
                   setIsExpanded(true)
@@ -98,34 +110,33 @@ export default function InstructionsBar({
               >
                 {isActive ? 'Edit' : 'Instructions'}
               </Button>
-            )}
+            </>
+          )}
 
-            {value.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="sysprompt-clear-btn"
-                onClick={handleClear}
-                disabled={disabled}
+          {isExpanded && (
+            <>
+              {value.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="2xs"
+                  className="sysprompt-clear-btn"
+                  onClick={handleClear}
+                  disabled={disabled}
+                  type="button"
+                >
+                  Clear
+                </Button>
+              )}
+              <button
                 type="button"
-              >
-                Clear
-              </Button>
-            )}
-
-            {isExpanded && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="sysprompt-done-btn"
+                className="ui-btn sysprompt-done-btn"
                 onClick={handleDone}
                 disabled={disabled}
-                type="button"
               >
                 Done
-              </Button>
-            )}
-          </div>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

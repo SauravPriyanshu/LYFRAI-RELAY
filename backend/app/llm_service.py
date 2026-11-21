@@ -162,7 +162,7 @@ class LLMService:
                 status = simulate.get(key_id, simulate.get("*"))
                 if status is not None:
                     # Simulated provider failure: no network call, just count it and move on.
-                    logger.warning("%s on %s: simulated failure status=%s", key_id, current_model, status)
+                    logger.warning("%s: simulated failure status=%s", key_id, status)
                     failures += 1
                     simulated_any = True
                     attempts.append({

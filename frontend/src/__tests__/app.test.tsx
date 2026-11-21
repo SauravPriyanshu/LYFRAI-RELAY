@@ -279,6 +279,33 @@ describe('past sessions & layout enhancements', () => {
     expect(parsed[0].title).toBe('First user inquiry')
   })
 
+  it('allows renaming a session and persists the new title to localStorage', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(
+      'relay.sessions.v1',
+      JSON.stringify([
+        {
+          id: 'test-session-1',
+          title: 'Original Title',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]),
+    )
+    mount()
+
+    const renameBtn = await screen.findByRole('button', { name: /rename session original title/i })
+    await user.click(renameBtn)
+
+    const input = screen.getByRole('textbox', { name: /rename session/i })
+    await user.clear(input)
+    await user.type(input, 'Updated Session Title{Enter}')
+
+    expect(screen.getByText('Updated Session Title')).toBeTruthy()
+    const raw = localStorage.getItem('relay.sessions.v1')
+    expect(raw).toContain('Updated Session Title')
+  })
+
   it('loads past session history and gracefully renders missing metadata', async () => {
     const pastSessionId = 's-past-123'
     localStorage.setItem(
@@ -640,6 +667,47 @@ describe('message redesign and metadata receipt', () => {
     // Original latency savings line
     const savingsLine = screen.getByTestId('cache-savings-line')
     expect(savingsLine.textContent).toBe('Served from cache in 3 ms (live call took 236 ms)')
+  })
+
+  it('renders long markdown reply with headings, lists, table, hr, and math', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/health')) return json(200, defaultHealth)
+      if (url.includes('/chat')) {
+        return json(
+          200,
+          okBody({
+            reply: `# Top Heading\n\n## Subheading\n\nA regular paragraph with **bold** text.\n\n---\n\n- Bullet 1\n- Bullet 2\n\n1. Numbered 1\n2. Numbered 2\n\n| Column A | Column B |\n| --- | --- |\n| Cell 1 | Cell 2 |\n\nInline math $\\frac{1}{2} \\times \\text{base}$ and block math:\n\n$$a + b > c$$\n\n> A blockquote here.\n\n\`\`\`javascript\nconst x = 42;\n\`\`\``,
+          }),
+        )
+      }
+      return json(404, {})
+    })
+
+    const user = userEvent.setup()
+    mount()
+
+    await user.type(screen.getByTestId('chat-input'), 'Complex markdown{Enter}')
+
+    const msg = await screen.findByTestId('assistant-message')
+    expect(msg).toBeTruthy()
+
+    // Heading elements
+    expect(within(msg).getByRole('heading', { level: 1 }).textContent).toBe('Top Heading')
+    expect(within(msg).getByRole('heading', { level: 2 }).textContent).toBe('Subheading')
+
+    // Table elements
+    expect(within(msg).getByRole('table')).toBeTruthy()
+    expect(within(msg).getByText('Cell 1')).toBeTruthy()
+
+    // Math elements (KaTeX renders .katex)
+    expect(msg.querySelector('.katex')).toBeTruthy()
+
+    // Blockquote
+    expect(msg.querySelector('blockquote')).toBeTruthy()
+
+    // HR
+    expect(msg.querySelector('hr')).toBeTruthy()
   })
 
   it('never shows or computes token totals anywhere in the message or receipt', async () => {

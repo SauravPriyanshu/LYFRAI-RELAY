@@ -56,6 +56,22 @@ export function deleteSession(id: string): StoredSession[] {
   return filtered
 }
 
+export function renameSession(id: string, newTitle: string): StoredSession[] {
+  const list = loadSessions()
+  const idx = list.findIndex((s) => s.id === id)
+  if (idx >= 0) {
+    const next = [...list]
+    next[idx] = {
+      ...next[idx],
+      title: newTitle.trim() || next[idx].title,
+      updatedAt: new Date().toISOString(),
+    }
+    saveSessions(next)
+    return next
+  }
+  return list
+}
+
 export function formatRelativeTime(dateStr: string): string {
   try {
     const d = new Date(dateStr)
